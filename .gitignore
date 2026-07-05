@@ -1,0 +1,73 @@
+# === 팀 대화 로그 (민감정보 포함 가능 — 절대 커밋 X) ===
+team_chat/**
+
+# === 대용량 데이터 ===
+data/raw/*.jsonl
+data/raw/*.csv
+data/processed/**
+data/external/**
+
+# 예외: 원본 open.zip은 Github에 유지 (다른 서버 이관용, 30MB)
+!data/raw/open.zip
+# 예외: sample_submission.csv, test.jsonl (형식 확인용, 2K)
+!data/raw/sample_submission.csv
+!data/raw/test.jsonl
+
+# === 대형 뷰어 (팀 자산 재현본, 97MB) ===
+team_ref/yongwook_dataviz_v01/train_viewer_large.html
+
+# === 모델/파이프라인 산출물 ===
+**/*.pkl
+**/*.pt
+**/*.pth
+**/*.bin
+**/*.safetensors
+**/*.onnx
+**/*.ckpt
+
+# === 실험 산출물 ===
+experiments/*/model/
+experiments/*/checkpoints/
+experiments/*/logs/
+experiments/*/wandb/
+experiments/*/*.log
+
+# === 제출 zip ===
+submissions/*.zip
+
+# === baseline 다운로드본 (원본 open.zip에서 복원 가능) ===
+baseline/model/*.pkl
+
+# === 팀 참조 코드 대용량 산출물 (스크립트/설정은 커밋) ===
+team_ref/**/model/
+team_ref/**/checkpoints/
+team_ref/**/*.pkl
+team_ref/**/*.pt
+team_ref/**/*.bin
+team_ref/**/*.safetensors
+team_ref/_incoming/
+
+# === Python 캐시 ===
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ipynb_checkpoints/
+
+# === conda/env ===
+.env
+env/
+venv/
+
+# === IDE ===
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# === OS ===
+.DS_Store
+Thumbs.db
+
+# === Jupyter output cells (선택) ===
+# notebooks/*.ipynb 는 커밋하되 output 초기화 후 커밋 권장

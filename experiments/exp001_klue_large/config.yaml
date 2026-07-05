@@ -1,0 +1,42 @@
+exp_id: exp001_klue_large
+timestamp: 2026-07-03
+model: klue/roberta-large
+model_params_est: 337M
+model_size_fp16_est_mb: 670
+input_serialize: sanghyuk_v01 (common.py::serialize) — full features (prompt+CUE+history+meta)
+max_length: 512
+
+training:
+  epochs: 4
+  train_batch_size: 16
+  eval_batch_size: 64
+  lr: 2e-5
+  weight_decay: 0.01
+  warmup_ratio: 0.06
+  fp16: true
+  seed: 42
+  val_size: 0.1
+  pool: cls
+  split: group  # StratifiedGroupKFold, session id
+  loss_type: weighted_ce  # inverse-freq class weight
+  tune_thresholds: true
+
+adversarial:
+  fgm: false  # 1차 실험은 순수 인코더로
+  awp: false
+
+distillation:
+  teacher_logits: null
+
+hardware:
+  gpu: 5  # RTX 3090 24GB
+  cuda: 12.4
+
+expected_runtime_hours: 2.5-4
+
+comparisons:
+  team_baseline_mdeberta_ko_cls_3ep_server_lb: 0.6954
+  sanghyuk_v01_server_lb: 0.77585
+  our_baseline_tfidf_logreg_oof: 0.4312
+
+goal: klue-large의 fold_0 val Macro-F1 확보. 상혁 mDeBERTa 접근과 diverse한 encoder로 앙상블 재료 확보.

@@ -16,6 +16,12 @@ data/external/**
 # === 대형 뷰어 (팀 자산 재현본, 97MB) ===
 team_ref/yongwook_dataviz_v01/train_viewer_large.html
 
+# === 경쟁팀 private 리포 클론 (재배포 금지 — 완전 제외) ===
+team_ref/roka_jeong/
+
+# === 참고논문 PDF 원본 (저작권 — 재배포 대신 docs에 링크로 인용) ===
+.paper/
+
 # === 모델/파이프라인 산출물 ===
 **/*.pkl
 **/*.pt
@@ -31,6 +37,24 @@ experiments/*/checkpoints/
 experiments/*/logs/
 experiments/*/wandb/
 experiments/*/*.log
+
+# === 실험 폴더 안 raw 데이터 사본 (data/raw/ 원본과 중복) ===
+experiments/**/data/train.jsonl
+experiments/**/data/test.jsonl
+experiments/**/data/train_labels.csv
+
+# === HF Trainer/추론 raw 산출물 (체크포인트·런 디렉토리·대형 vocab 덤프) ===
+**/runs/
+**/_hf_ckpt/
+**/checkpoint-*/
+**/tokenizer.json
+**/raw_*/
+**/member_*/
+submissions/*/model/
+
+# === 모델 zip (가중치 포함, GitHub 100MB 한계 초과) ===
+**/*.zip
+!data/raw/open.zip
 
 # === 제출 zip ===
 submissions/*.zip

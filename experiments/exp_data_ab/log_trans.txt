@@ -1,0 +1,15 @@
+[trans] 5000개 샘플 (val 제외 확인)
+  eng_Latn->kor_Hang 48/4309
+  eng_Latn->kor_Hang 528/4309
+  eng_Latn->kor_Hang 1008/4309
+  eng_Latn->kor_Hang 1488/4309
+  eng_Latn->kor_Hang 1968/4309
+  eng_Latn->kor_Hang 2448/4309
+  eng_Latn->kor_Hang 2928/4309
+  eng_Latn->kor_Hang 3408/4309
+  eng_Latn->kor_Hang 3888/4309
+  kor_Hang->eng_Latn 48/691
+  kor_Hang->eng_Latn 528/691
+
+[done] 4991개. 결과언어: {'ko': 2772, 'en': 691, 'mixed': 1528}
+샘플: 이 사업자를 찾아내면 누가 이 일을 할 수 있는지 알아

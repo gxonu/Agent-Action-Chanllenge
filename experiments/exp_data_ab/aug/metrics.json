@@ -1,0 +1,5 @@
+{
+  "cond": "aug",
+  "sim_val_macro_f1": 0.7343,
+  "n_train": 68762
+}

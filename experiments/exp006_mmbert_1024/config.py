@@ -17,7 +17,7 @@ from typing import List
 # 기본(경량·서버호환·다국어) -> "microsoft/mdeberta-v3-base"
 # 대안                       -> "FacebookAI/xlm-roberta-base"
 # 업그레이드(한국어+코드 최강) -> "Qwen/Qwen2.5-1.5B" (Qwen2 arch, 4.46.3 OK, LoRA 권장)
-MODEL_NAME = "klue/roberta-large"
+MODEL_NAME = "jhu-clsp/mmBERT-base"
 
 # history 평균 6.9턴. current_prompt + 최근 history 를 512 안에 담음.
 MAX_LENGTH = 512

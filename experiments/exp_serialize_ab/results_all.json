@@ -1,0 +1,95 @@
+{
+  "base": {
+    "macro_f1": 0.7562,
+    "n_eval": 14001,
+    "rare_f1": {
+      "web_search": 0.7182,
+      "write_file": 0.9916,
+      "lint_or_typecheck": 0.6303
+    },
+    "inspect_f1": {
+      "read_file": 0.5731,
+      "grep_search": 0.6163,
+      "list_directory": 0.5165,
+      "glob_pattern": 0.6436
+    },
+    "per_class": {
+      "read_file": 0.5731,
+      "grep_search": 0.6163,
+      "list_directory": 0.5165,
+      "glob_pattern": 0.6436,
+      "edit_file": 0.9784,
+      "write_file": 0.9916,
+      "apply_patch": 0.9591,
+      "run_bash": 0.8018,
+      "run_tests": 0.809,
+      "lint_or_typecheck": 0.6303,
+      "ask_user": 0.6545,
+      "plan_task": 0.6939,
+      "web_search": 0.7182,
+      "respond_only": 1.0
+    }
+  },
+  "cue": {
+    "macro_f1": 0.7542,
+    "n_eval": 14001,
+    "rare_f1": {
+      "web_search": 0.6922,
+      "write_file": 0.9916,
+      "lint_or_typecheck": 0.6319
+    },
+    "inspect_f1": {
+      "read_file": 0.5726,
+      "grep_search": 0.6291,
+      "list_directory": 0.5091,
+      "glob_pattern": 0.6414
+    },
+    "per_class": {
+      "read_file": 0.5726,
+      "grep_search": 0.6291,
+      "list_directory": 0.5091,
+      "glob_pattern": 0.6414,
+      "edit_file": 0.9776,
+      "write_file": 0.9916,
+      "apply_patch": 0.9554,
+      "run_bash": 0.8042,
+      "run_tests": 0.807,
+      "lint_or_typecheck": 0.6319,
+      "ask_user": 0.6486,
+      "plan_task": 0.6982,
+      "web_search": 0.6922,
+      "respond_only": 1.0
+    }
+  },
+  "reorder": {
+    "macro_f1": 0.7565,
+    "n_eval": 14001,
+    "rare_f1": {
+      "web_search": 0.7199,
+      "write_file": 0.995,
+      "lint_or_typecheck": 0.6316
+    },
+    "inspect_f1": {
+      "read_file": 0.5876,
+      "grep_search": 0.6324,
+      "list_directory": 0.5068,
+      "glob_pattern": 0.6478
+    },
+    "per_class": {
+      "read_file": 0.5876,
+      "grep_search": 0.6324,
+      "list_directory": 0.5068,
+      "glob_pattern": 0.6478,
+      "edit_file": 0.9772,
+      "write_file": 0.995,
+      "apply_patch": 0.9548,
+      "run_bash": 0.7927,
+      "run_tests": 0.803,
+      "lint_or_typecheck": 0.6316,
+      "ask_user": 0.6541,
+      "plan_task": 0.6876,
+      "web_search": 0.7199,
+      "respond_only": 1.0
+    }
+  }
+}

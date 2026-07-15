@@ -1,0 +1,206 @@
+"""
+학습/추론이 공유하는 핵심 로직: 입력 직렬화 + 라벨 인코딩.
+
+[serialize_v2 — EDA v3 §7.6 기반, exp007]
+상혁 v01 대비 3가지 변경 (데이터 검증 완료):
+  1) 판별 cue 토큰 lint(타입체크→17.5×)/write(골격→35×) 추가  (V5)
+  2) last_action을 CUE에 표면화 (V1: 같은 prompt 충돌 55%→30% 해소; HISTORY에 묻혀있던 신호를 명시)
+  3) 직렬화 순서 PROMPT→CUE→META→HISTORY (기존 …→HISTORY→META). META(open_files 포함)가
+     truncation 시 먼저 잘리던 결함 수정 (V3). truncation은 이제 오래된 HISTORY부터.
+
+주의: 추론 코드(script.py)의 serialize()와 반드시 동일 유지 (KEEP IN SYNC).
+동작은 model/serialize_config.json 으로 잠금.
+"""
+import json
+import re
+from typing import Any, Dict, List
+
+# 탐색 클러스터 판별용 lexical 패턴 (KEEP IN SYNC with script.py)
+_PATH_RE = re.compile(r"[\w./-]+\.(py|ts|js|tsx|jsx|java|go|rs|sql|ya?ml|json|md|toml|cfg|ini|sh|rb|php|cpp?|h|hpp)\b", re.I)
+_SYM_RE = re.compile(r"어디|정의|찾아|찾을|참조|걸린|import|where|defined|declared|uses?|reference|grep|검색", re.I)
+_DIR_RE = re.compile(r"목록|뭐\s*있|어떤\s*파일|리스트|디렉|폴더|구조|ls\b|list|안에\s*뭐|들어\s*?있", re.I)
+_GLOB_RE = re.compile(r"\*\.|모든\s|전부|테스트\s*파일|\.\w+\s*파일|패턴|매칭|glob|all\s+\w+\s+files", re.I)
+
+# [v2] action 판별 cue (EDA v3 V5, data-verified lift). web은 web_search 미가리켜 제외.
+_LINT_RE = re.compile(r"타입\s*체크|typecheck|type-?check|mypy", re.I)                    # → lint_or_typecheck 17.5×
+_WRITE_RE = re.compile(r"골격|scaffold|from\s*scratch|scratch|overwrite|처음부터", re.I)   # → write_file 35×
+
+
+def _explore_cues(prompt: str) -> Dict[str, int]:
+    p = prompt or ""
+    return {
+        "path": 1 if _PATH_RE.search(p) else 0,   # 명시 파일경로 -> read_file
+        "sym":  1 if _SYM_RE.search(p) else 0,     # 심볼/개념 쿼리 -> grep_search
+        "dir":  1 if _DIR_RE.search(p) else 0,     # 디렉토리 질의 -> list_directory
+        "glob": 1 if _GLOB_RE.search(p) else 0,    # 패턴 -> glob_pattern
+    }
+
+
+def _action_cues(prompt: str) -> Dict[str, int]:
+    """[v2] rare class 판별 토큰. lint/write는 완전분리급 lift."""
+    p = prompt or ""
+    return {
+        "lint":  1 if _LINT_RE.search(p) else 0,
+        "write": 1 if _WRITE_RE.search(p) else 0,
+    }
+
+
+def _last_action_name(history: Any) -> str:
+    """[v2] 가장 최근 assistant_action name. 없으면 'none'(=세션시작 플래그 겸용).
+    EDA v3 V1: last_action 조건 하나로 라벨 충돌 55%→30% 해소. 원래 HISTORY 문자열에 묻혀 있어
+    명시 토큰으로 표면화."""
+    if isinstance(history, list):
+        for t in reversed(history):
+            if isinstance(t, dict) and (t.get("role") == "assistant_action" or t.get("name")):
+                return str(t.get("name") or "none")
+    return "none"
+
+
+# ---------------------------------------------------------------------------
+# 입력 직렬화: current_prompt + history + session_meta -> 단일 문자열
+# ---------------------------------------------------------------------------
+def _fmt_args(args: Any) -> str:
+    if not isinstance(args, dict) or not args:
+        return ""
+    return ",".join(f"{k}={v}" for k, v in args.items())
+
+
+def _stringify_history(history: Any, max_steps: int) -> str:
+    """실제 포맷: user{role,content} / assistant_action{role,name,args,result_summary}."""
+    if history is None:
+        return ""
+    if isinstance(history, str):
+        return history.strip()
+    if not isinstance(history, list):
+        return str(history)
+
+    def is_action(s):
+        return isinstance(s, dict) and (s.get("role") == "assistant_action" or s.get("name"))
+
+    # (user 요청 -> 그 결과 action) 을 한 덩어리로 묶음 = prompt->action 시연
+    pairs: List[str] = []
+    i, n = 0, len(history)
+    while i < n:
+        t = history[i]
+        if not isinstance(t, dict):
+            i += 1; continue
+        if is_action(t):                      # user 없는 action
+            a = t
+            pairs.append(f"({a.get('name','')}({_fmt_args(a.get('args'))}): "
+                         f"{(a.get('result_summary') or '').strip()})")
+            i += 1
+        else:                                 # user turn
+            content = (t.get("content") or t.get("text") or "").strip()
+            if i + 1 < n and is_action(history[i + 1]):   # 다음 action 과 묶기
+                a = history[i + 1]
+                pairs.append(f"(user: {content} -> {a.get('name','')}"
+                             f"({_fmt_args(a.get('args'))}): {(a.get('result_summary') or '').strip()})")
+                i += 2
+            else:
+                pairs.append(f"(user: {content})")
+                i += 1
+
+    if max_steps is not None and len(pairs) > max_steps:
+        pairs = pairs[-max_steps:]           # 최근 쌍 우선 보존
+    return " ".join(reversed(pairs))         # 최근->과거 (truncation 시 오래된 쌍부터)
+
+
+def _stringify_meta(meta: Any, add_open_files: bool = False,
+                    add_langmix: bool = False, max_open: int = 8) -> str:
+    """nested session_meta 평탄화. 블록별 토글로 open_files/langmix 개별 추가."""
+    if meta is None:
+        return ""
+    if not isinstance(meta, dict):
+        return str(meta)
+    ws = meta.get("workspace") or {}
+    open_files = ws.get("open_files") or []
+    lang_mix = ws.get("language_mix") or {}
+    top_lang = max(lang_mix, key=lang_mix.get) if isinstance(lang_mix, dict) and lang_mix else "na"
+    # 식별자(파일경로) 대신 강건한 플래그만 (경로는 과적합)
+    has_test = 1 if any("test" in str(f).lower() for f in open_files) else 0
+    has_cfg = 1 if any(str(f).endswith((".yml", ".yaml", ".toml", ".json", ".cfg", ".ini"))
+                       for f in open_files) else 0
+    parts = [
+        f"tier={meta.get('user_tier')}",
+        f"lang={meta.get('language_pref')}",
+        f"turn={meta.get('turn_index')}",
+        f"budget={meta.get('budget_tokens_remaining')}",
+        f"ci={ws.get('last_ci_status')}",
+        f"dirty={ws.get('git_dirty')}",
+        f"loc={ws.get('loc')}",
+        f"toplang={top_lang}",
+        f"nopen={len(open_files)}",
+        f"hastest={has_test}",
+        f"hascfg={has_cfg}",
+    ]
+    if add_open_files:
+        # 빈 상태(cold-start)도 명시 마커(none)로 -> 학습/추론 표현 일관 (absence 금지)
+        val = ",".join(str(f) for f in open_files[:max_open]) if open_files else "none"
+        parts.append(f"open_files={val}")
+    if add_langmix and isinstance(lang_mix, dict) and lang_mix:
+        parts.append("langmix=" + ",".join(f"{k}:{v}" for k, v in lang_mix.items()))
+    return " ".join(parts)
+
+
+def serialize(current_prompt: Any, history: Any, session_meta: Any, cfg: Dict) -> str:
+    """
+    [serialize_v2] 순서: PROMPT -> CUE(q/short/last[/cues]) -> META -> HISTORY.
+    cfg 예시 (model/serialize_config.json 으로 저장/로드):
+      {"meta_marker":"[META]","history_marker":"[HISTORY]",
+       "prompt_marker":"[PROMPT]","max_history_steps":12,
+       "add_symbol_cues":false,"add_action_cues":true,...}
+    """
+    meta_s = _stringify_meta(session_meta, cfg.get("add_open_files", False),
+                             cfg.get("add_langmix", False), cfg.get("max_open_files", 8))
+    hist_s = _stringify_history(history, cfg.get("max_history_steps"))
+    prompt_s = "" if current_prompt is None else str(current_prompt).strip()
+
+    # 강건한 신호만 (이진 플래그). plen(정확한 길이)은 과적합이라 제거.
+    q = 1 if prompt_s.endswith("?") else 0
+    short = 1 if len(prompt_s) < 25 else 0
+    last = _last_action_name(history)                       # [v2] last_action 표면화
+    cue = f"[CUE] q={q} short={short} last={last}"
+    # 판별 피처(add_symbol_cues): 탐색 클러스터 경계용 lexical 신호
+    if cfg.get("add_symbol_cues", False):
+        c = _explore_cues(prompt_s)
+        cue += f" path={c['path']} sym={c['sym']} dir={c['dir']} glob={c['glob']}"
+    # [v2] rare class 판별 cue (lint/write)
+    if cfg.get("add_action_cues", False):
+        a = _action_cues(prompt_s)
+        cue += f" lint={a['lint']} write={a['write']}"
+
+    # [v2] 순서: 현재발화 -> cue -> meta -> 최근history. (META를 앞으로: truncation 시 open_files 보호)
+    parts = [f"{cfg['prompt_marker']} {prompt_s}", cue]
+    if meta_s:
+        parts.append(f"{cfg['meta_marker']} {meta_s}")
+    if hist_s:
+        parts.append(f"{cfg['history_marker']} {hist_s}")
+    return " ".join(parts)
+
+
+def serialize_config_from(SER) -> Dict:
+    return {
+        "meta_marker": SER.meta_marker,
+        "history_marker": SER.history_marker,
+        "prompt_marker": SER.prompt_marker,
+        "max_history_steps": SER.max_history_steps,
+        "add_symbol_cues": SER.add_symbol_cues,
+        "add_open_files": SER.add_open_files,
+        "add_langmix": SER.add_langmix,
+        "max_open_files": SER.max_open_files,
+        "add_action_cues": getattr(SER, "add_action_cues", False),   # [v2]
+    }
+
+
+# ---------------------------------------------------------------------------
+# 라벨 인코딩
+# ---------------------------------------------------------------------------
+def build_label_maps(labels: List[str], class_names: List[str] = None):
+    """label2id, id2label 생성. class_names 주어지면 그 순서 고정, 아니면 정렬해서 사용."""
+    if class_names:
+        classes = list(class_names)
+    else:
+        classes = sorted(set(map(str, labels)))
+    label2id = {c: i for i, c in enumerate(classes)}
+    id2label = {i: c for c, i in label2id.items()}
+    return label2id, id2label

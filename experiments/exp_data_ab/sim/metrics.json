@@ -1,0 +1,5 @@
+{
+  "cond": "sim",
+  "sim_val_macro_f1": 0.7545,
+  "n_train": 58438
+}

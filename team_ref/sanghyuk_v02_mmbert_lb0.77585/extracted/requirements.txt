@@ -1,0 +1,2 @@
+# 서버 기본 transformers(4.46.3)는 modernbert 미지원 -> 업글 필요
+transformers==4.48.3
